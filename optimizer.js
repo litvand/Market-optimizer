@@ -248,6 +248,7 @@ function destroyForge(city, iSpot, levels) {
 function buildForge(city, iSpot, levels) {
   const spot = city.forgeSpots[iSpot]
   levels[spot.iTile] = spot.level
+  return level
 }
 
 function incForges(cities, forges, levels) {
@@ -257,13 +258,12 @@ function incForges(cities, forges, levels) {
       continue
     }
 
-    levels[city.forgeSpots[forges[iC]].iTile] = 0
+    destroyForge(city, forges[iC], levels)
     forges[iC] = (forges[iC] + 1) % city.forgeSpots.length
-    const spot = city.forgeSpots[forges[iC]]
-    levels[spot.iTile] = spot.level
+    const level = buildForge(city, forges[iC], levels)
 
-    // Always start with no buildings, so "level 0" = back to start
-    if (spot.level > 0) {
+    // forgeSpots[0] always has level 0, so "level 0" = wrapped around
+    if (level > 0) {
       return true
     }
   }
@@ -401,12 +401,8 @@ function tilesToStr(tiles, cities, buildings) {
 
     for (let xR = 0; xR < row.length- 1; xR += 2) {
       ++iT
-
-      const digit = digits[iT]
-      row[xR] = digit ? digit: UNUSABLE
-
-      const typ = types[iT]
-      row[xR + 1] = typ ? typ: UNUSABLE
+      row[xR] = digits[iT]
+      row[xR + 1] = types[iT]
     }
     rows.push(decoder.decode(row))
   }

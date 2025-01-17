@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+  <meta charset="utf-8">
+  <title>Market optimizer</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <style>
+    div {
+      font-family: monospace;
+    }
+  </style>
+  <script src="optimizer.js" async></script>
+</head>
+
+<body>
+  <div id="legend" style="white-space: pre-line;">
+    2c = city 2
+    22 = farmable crop of city 2
+    2e = empty field/aquarion water
+    2m = mineable metal
+    spaces = unusable tiles
+    <!-- 2f = farm/aqua farm -->
+    $ = market
+    ^ = forge
+    + = windmill
+  </div>
+
+  <!-- input id="aquarion" type="checkbox" -->
+  <textarea id="map" rows="17" cols="40">
+
+    1e1c1e  2e2c2e
+    1m  1m1e  2e2e
+    0e0e0e0m
+    0e0c0e
+    0e0e0e
+  </textarea>
+
+  <div id="out" style="white-space: pre;">
+    0 stars
+  </div>
+
+  <button id="go">
+    Go!
+  </button>
+
+</body>
+</html>

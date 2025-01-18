@@ -248,7 +248,7 @@ function destroyForge(city, iSpot, levels) {
 function buildForge(city, iSpot, levels) {
   const spot = city.forgeSpots[iSpot]
   levels[spot.iTile] = spot.level
-  return level
+  return spot.level
 }
 
 function incForges(cities, forges, levels) {
@@ -410,11 +410,13 @@ function tilesToStr(tiles, cities, buildings) {
 }
 
 function optimize(tiles) {
+  const tCity = Date.now()
   const cities = findCities(tiles)
   if (cities.length === 0) {
     return "no cities"
   }
 
+  const tForge = Date.now()
   setForgeSpots(tiles, cities)
 
   const levels = new Int8Array(tiles.digits.length)
@@ -422,6 +424,7 @@ function optimize(tiles) {
   let maxBuildings = []
   let maxStars = 0
 
+  const tInc = Date.now()
   while (incForges(cities, buildings.forges, levels)) {
     let stars = 0
     while (stars >= 0) {
@@ -439,6 +442,7 @@ function optimize(tiles) {
     //levels.fill(0) // Redundant
   }
   
+  const tStr = Date.now()
   if (maxBuildings.length > 10) {
     const step = 1 + Math.floor(maxBuildings.length / 10)
     const keep = []
@@ -458,8 +462,16 @@ function optimize(tiles) {
   for (const b of maxBuildings) {
     maps.push(tilesToStr(tiles, cities, b))
   }
+  const out = `${maps.join("\n---\n")}\n\n${maxStars} stars\n\n`
 
-  return `${maps.join("\n---\n")}\n\n${maxStars} stars`
+  const tEnd = Date.now()
+  const timings = `
+  Cities ${tForge - tCity}ms
+  Forge spots ${tInc - tForge}ms
+  Inc loop ${tStr - tInc}ms
+  toString ${tEnd - tStr}ms
+  `
+  return out + timings
 }
 
 document.addEventListener("DOMContentLoaded", () => {

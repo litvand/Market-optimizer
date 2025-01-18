@@ -129,9 +129,8 @@ function findCities(tiles) {
   for (let iC = 0; iC < 10; ++iC) {
     cities.push({
       iTile: [],
-      empties: [],
-      crops: [],
       mines: [],
+      spots: [0],
       forgeSpots: []
     })
   }
@@ -139,7 +138,7 @@ function findCities(tiles) {
   // Small hash table
   const members = []
   members[CITY] = "iTile"
-  members[EMPTY] = "empties"
+  members[EMPTY] = "spots"
   members[MINE] = "mines"
 
   const iEnd = tiles.digits.length - tiles.width - 1
@@ -153,7 +152,7 @@ function findCities(tiles) {
     )
 
     const t = tiles.types[iT]
-    const member = t === digit ? "crops": members[t]
+    const member = t === digit ? "spots": members[t]
     if (!member) {
       //alert(`${t}\n${members[t]}\n${members[CITY]}\n${CITY}`)
       throwTile(
@@ -176,11 +175,6 @@ function findCities(tiles) {
       // Doesn't change cities.length
       cities[iC] = null
     }
-
-    assert(
-      spotTile(cities[iC], 0) === 0,
-      ()=>"'No building' case missing"
-    )
   }
   return cities
 }
@@ -213,27 +207,18 @@ function setForgeSpots(tiles, cities) {
   for (let city of cities) {
     if (!city) continue
 
-    // Level 0 forge on an unusable tile to
-    // handle the no-forge case
-    city.forgeSpots.push({
-      iTile: 0,
-      level: 0
-    })
-
-    for (let crop of city.crops) {
-      if (nearMine[crop]) {
+    for (let spot of city.spots) {
+      if (spot === 0) {
+        // Level 0 forge on an unusable tile to
+        // handle the no-forge case
         city.forgeSpots.push({
-          iTile: crop,
-          level: nearMine[crop]
+          iTile: 0,
+          level: 0
         })
-      }
-    }
-
-    for (let empty of city.empties) {
-      if (nearMine[empty]) {
+      } else if (nearMine[spot]) {
         city.forgeSpots.push({
-          iTile: empty,
-          level: nearMine[empty]
+          iTile: spot,
+          level: nearMine[spot]
         })
       }
     }
@@ -262,7 +247,7 @@ function incForges(cities, forges, levels) {
     forges[iC] = (forges[iC] + 1) % city.forgeSpots.length
     const level = buildForge(city, forges[iC], levels)
 
-    // forgeSpots[0] always has level 0, so "level 0" = wrapped around
+    // Only forgeSpots[0] has level 0, so "level 0" = wrapped around
     if (level > 0) {
       return true
     }
@@ -270,41 +255,26 @@ function incForges(cities, forges, levels) {
   return false
 }
 
-function nSpots(city) {
-  return 1 + city.empties.length + city.crops.length
-}
-
-// Returns iTile.
-function spotTile(city, iSpot) {
-  if (iSpot < 1) return iSpot
-
-  if (iSpot < 1 + city.empties.length) {
-    return city.empties[iSpot - 1]
-  }
-
-  return city.crops[iSpot - city.empties.length - 1]
-}
-
 function incWindmills(cities, windmills, levels, tiles) {
   for (let iC in cities) {
     const city = cities[iC]
     if (!city) continue
 
-    const n = nSpots(city)
-    let iTile = getSpot(city, windmills[iC])
+    let iTile = city.spots[windmills[iC]]
     levels[iTile] = 0
 
     while (true) {
-      windmills[iC] = (windmills[iC]+ 1) % n
-      iTile = getSpot(city, windmills[iC])
+      windmills[iC] = (windmills[iC]+ 1) % city.spots.length
+      iTile = city.spots[windmills[iC]]
+      // Break if no forge
       if (levels[iTile] === 0) break
     }
-
-    if (iTile !== 0) {
-      // Placeholder level
-      levels[iTile] = 1
-      return true
-    }
+    // Continue to next city if this city wrapped around
+    if (iTile === 0) continue
+    
+    // Placeholder level
+    levels[iTile] = 1
+    return true
   }
 
   return false
@@ -317,7 +287,7 @@ function incMarkets(cities, markets, levels, tiles, stars) {
 
     // Level x>0 => normal building
     // Level -x => market level x
-    let iTile = spotTile(city, markets[iC])
+    let iTile = city.spots[markets[iC]]
     const level = levels[iTile]
     assert(
       level <= 0,
@@ -329,10 +299,9 @@ function incMarkets(cities, markets, levels, tiles, stars) {
     levels[iTile] = 0
 
     // Find next valid market spot of this city, or 0 for no market
-    const n = nSpots(city)
     while (true) {
-      markets[iC] = (markets[iC] + 1) % n
-      iTile = spotTile(city, markets[iC])
+      markets[iC] = (markets[iC] + 1) % city.spots.length
+      iTile = city.spots[markets[iC]]
       // Invalid if the tile already has a building
       if (levels[iTile]) continue
       if (iTile === 0) break
@@ -343,7 +312,7 @@ function incMarkets(cities, markets, levels, tiles, stars) {
       })
       // Invalid if level 0
       if (levels[iTile]) break
-      
+
       levels[iTile] = Math.max(-8, levels[iTile])
     }
     // If looped through all valid market spots of this city, continue to next city
@@ -387,8 +356,8 @@ function tilesToStr(tiles, cities, buildings) {
 
     const spot = city.forgeSpots[buildings.forges[iC]]
     types[spot.iTile] = FORGE
-    types[spotTile(city, buildings.windmills[iC])] = WINDMILL
-    types[spotTile(city, buildings.markets[iC])] = MARKET
+    types[city.spots[buildings.windmills[iC]]] = WINDMILL
+    types[city.spots[buildings.markets[iC]]] = MARKET
   }
 
   const rows = []
@@ -425,23 +394,26 @@ function optimize(tiles) {
   let maxStars = 0
 
   const tInc = Date.now()
-  while (incForges(cities, buildings.forges, levels)) {
-    let stars = 0
-    while (stars >= 0) {
-      stars = incMarkets(
-        cities, buildings.markets, levels, tiles, stars
-      )
-      if (stars >= maxStars) {
-        if (stars > maxStars) {
-          maxStars = stars
-          maxBuildings = []
+  while (true) {
+    while (true) {
+      let stars = 0
+      while (stars >= 0) {
+        stars = incMarkets(
+          cities, buildings.markets, levels, tiles, stars
+        )
+        if (stars >= maxStars) {
+          if (stars > maxStars) {
+            maxStars = stars
+            maxBuildings = []
+          }
+          maxBuildings.push(copyBuildings(buildings))
         }
-        maxBuildings.push(copyBuildings(buildings))
       }
+      if (!incWindmills(cities, buildings.windmills, levels)) break
     }
-    //levels.fill(0) // Redundant
+    if (!incForges(cities, buildings.forges, levels)) break
   }
-  
+
   const tStr = Date.now()
   if (maxBuildings.length > 10) {
     const step = 1 + Math.floor(maxBuildings.length / 10)
@@ -451,7 +423,7 @@ function optimize(tiles) {
     }
     maxBuildings = keep
   }
-  
+
   const maps = []
   for (let iT in tiles.types) {
     if (!tiles.types[iT]) {

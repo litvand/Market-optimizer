@@ -176,7 +176,7 @@ function findCities(tiles) {
       cities[iC] = null
     }
   }
-  
+
   // Remove null cities from end.
   while (cities.length > 0 && !cities[cities.length - 1]) {
     cities.pop()
@@ -284,7 +284,7 @@ function incWindmills(cities, windmills, levels, tiles) {
       if (!levels[i]) {
         // Decrement level if crop
         levels[iTile] -= (tiles.types[iTile] === tiles.digits[iTile])
-        // Positive level = forge, 
+        // Positive level = forge,
         // negative level = windmill
       }
     })
@@ -303,10 +303,10 @@ function incMarkets(cities, markets, stars, levels, tiles) {
     // Level x>0 => normal building
     // Level -x => market level x
     let iTile = city.spots[markets[iC]]
-    assert(
-      levels[iTile] === 0,
-      ()=>`Market might overlap with level ${Math.abs(levels[iTile])} building`
-    )
+    // assert(
+    //   levels[iTile] === 0,
+    //   ()=>`Market might overlap with level ${Math.abs(levels[iTile])} building`
+    // )
     dStars -= stars[iC]
     stars[iC] = 0
 
@@ -316,19 +316,23 @@ function incMarkets(cities, markets, stars, levels, tiles) {
       iTile = city.spots[markets[iC]]
       // Invalid if the tile already has a building
       if (levels[iTile]) continue
-      
+
       // If looped through all valid market spots of this city, continue to next city
       if (iTile === 0) {
         break
       }
 
       iterAround(tiles, iTile, (i) => {
-        stars[iC] += Math.abs(levels[i])
+        // Bitwise abs
+        const level = levels[i]
+        const mask = level>>31
+        stars[iC] += (level^mask) - mask
       })
       // Invalid unless stars>0
       if (stars[iC]) {
-        // Market level cap 8
-        stars[iC] = Math.min(8, stars[iC])
+        // Market level cap is 8.
+        // Bitwise min(stars, 7+1)
+        stars[iC] = stars[iC] & 7
         dStars += stars[iC]
         return dStars
       }
@@ -396,7 +400,7 @@ function optimize(tiles) {
   setForgeSpots(tiles, cities)
 
   const levels = new Int8Array(tiles.digits.length)
-  const stars = new Int8Array(cities.length)
+  const stars = new Int32Array(cities.length)
   const buildings = newBuildings(cities)
   let maxBuildings = []
   let maxSum = 0

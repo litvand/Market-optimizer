@@ -176,6 +176,11 @@ function findCities(tiles) {
       cities[iC] = null
     }
   }
+  
+  // Remove null cities from end.
+  while (cities.length > 0 && !cities[cities.length - 1]) {
+    cities.pop()
+  }
   return cities
 }
 
@@ -260,6 +265,7 @@ function incWindmills(cities, windmills, levels, tiles) {
     const city = cities[iC]
     if (!city) continue
 
+    // Destroy windmill
     let iTile = city.spots[windmills[iC]]
     levels[iTile] = 0
 
@@ -271,16 +277,25 @@ function incWindmills(cities, windmills, levels, tiles) {
     }
     // Continue to next city if this city wrapped around
     if (iTile === 0) continue
-    
-    // Placeholder level
-    levels[iTile] = 1
+
+    // Build windmill
+    iterAround(tiles, iTile, (i) => {
+      // If no building on tile i
+      if (!levels[i]) {
+        // Decrement level if crop
+        levels[iTile] -= (tiles.types[iTile] === tiles.digits[iTile])
+        // Positive level = forge, 
+        // negative level = windmill
+      }
+    })
     return true
   }
 
   return false
 }
 
-function incMarkets(cities, markets, levels, tiles, stars) {
+function incMarkets(cities, markets, stars, levels, tiles) {
+  let dStars = 0
   for (let iC in cities) {
     const city = cities[iC]
     if (!city) continue
@@ -288,15 +303,12 @@ function incMarkets(cities, markets, levels, tiles, stars) {
     // Level x>0 => normal building
     // Level -x => market level x
     let iTile = city.spots[markets[iC]]
-    const level = levels[iTile]
     assert(
-      level <= 0,
-      ()=>`Markets should have negative levels, not ${level}`
+      levels[iTile] === 0,
+      ()=>`Market might overlap with level ${Math.abs(levels[iTile])} building`
     )
-
-    // Add negative level => subtract positive level
-    stars += level
-    levels[iTile] = 0
+    dStars -= stars[iC]
+    stars[iC] = 0
 
     // Find next valid market spot of this city, or 0 for no market
     while (true) {
@@ -304,30 +316,25 @@ function incMarkets(cities, markets, levels, tiles, stars) {
       iTile = city.spots[markets[iC]]
       // Invalid if the tile already has a building
       if (levels[iTile]) continue
-      if (iTile === 0) break
+      
+      // If looped through all valid market spots of this city, continue to next city
+      if (iTile === 0) {
+        break
+      }
 
       iterAround(tiles, iTile, (i) => {
-        const a = levels[i]
-        levels[iTile] -= (a > 0) * a
+        stars[iC] += Math.abs(levels[i])
       })
-      // Invalid if level 0
-      if (levels[iTile]) break
-
-      levels[iTile] = Math.max(-8, levels[iTile])
+      // Invalid unless stars>0
+      if (stars[iC]) {
+        // Market level cap 8
+        stars[iC] = Math.min(8, stars[iC])
+        dStars += stars[iC]
+        return dStars
+      }
     }
-    // If looped through all valid market spots of this city, continue to next city
-    if (iTile === 0) continue
-
-    // Subtract negative level => add positive level
-    stars -= levels[iTile]
-    assert(
-      stars >= 0,
-      () => `${stars} stars`
-    )
-    return stars
   }
-
-  return -1
+  return dStars
 }
 
 function newBuildings(cities) {
@@ -389,27 +396,29 @@ function optimize(tiles) {
   setForgeSpots(tiles, cities)
 
   const levels = new Int8Array(tiles.digits.length)
+  const stars = new Int8Array(cities.length)
   const buildings = newBuildings(cities)
   let maxBuildings = []
-  let maxStars = 0
+  let maxSum = 0
 
   const tInc = Date.now()
   while (true) {
     while (true) {
-      let stars = 0
-      while (stars >= 0) {
-        stars = incMarkets(
-          cities, buildings.markets, levels, tiles, stars
+      let starSum = 0
+      while (true) {
+        starSum += incMarkets(
+          cities, buildings.markets, stars, levels, tiles
         )
-        if (stars >= maxStars) {
-          if (stars > maxStars) {
-            maxStars = stars
+        if (starSum >= maxSum) {
+          if (starSum > maxSum) {
+            maxSum = starSum
             maxBuildings = []
           }
           maxBuildings.push(copyBuildings(buildings))
         }
+        if (starSum === 0) break
       }
-      if (!incWindmills(cities, buildings.windmills, levels)) break
+      if (!incWindmills(cities, buildings.windmills, levels, tiles)) break
     }
     if (!incForges(cities, buildings.forges, levels)) break
   }
@@ -434,7 +443,7 @@ function optimize(tiles) {
   for (const b of maxBuildings) {
     maps.push(tilesToStr(tiles, cities, b))
   }
-  const out = `${maps.join("\n---\n")}\n\n${maxStars} stars\n\n`
+  const out = `${maps.join("\n---\n")}\n\n${maxSum} stars\n\n`
 
   const tEnd = Date.now()
   const timings = `

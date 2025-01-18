@@ -282,10 +282,8 @@ function incWindmills(cities, windmills, levels, tiles) {
     iterAround(tiles, iTile, (i) => {
       // If no building on tile i
       if (!levels[i]) {
-        // Decrement level if crop
-        levels[iTile] -= (tiles.types[iTile] === tiles.digits[iTile])
-        // Positive level = forge,
-        // negative level = windmill
+        // increment level if crop
+        levels[iTile] += (tiles.types[iTile] === tiles.digits[iTile])
       }
     })
     return true
@@ -307,6 +305,12 @@ function incMarkets(cities, markets, stars, levels, tiles) {
     //   levels[iTile] === 0,
     //   ()=>`Market might overlap with level ${Math.abs(levels[iTile])} building`
     // )
+    let onCrop = tiles.types[iTile] === tiles.digits[iTile]
+    if (onCrop) {
+      iterAround(tiles, iTile, (i) => {
+        ++levels[i]
+      })
+    }
     dStars -= stars[iC]
     stars[iC] = 0
 
@@ -323,18 +327,22 @@ function incMarkets(cities, markets, stars, levels, tiles) {
       }
 
       iterAround(tiles, iTile, (i) => {
-        // Bitwise abs
+        // Bitwise max(level, 0)
+        levels[i] -= onCrop
         const level = levels[i]
         const mask = level>>31
-        stars[iC] += (level^mask) - mask
+        stars[iC] += level & ~mask
       })
       // Invalid unless stars>0
       if (stars[iC]) {
         // Market level cap is 8.
-        // Bitwise min(stars, 7+1)
-        stars[iC] = stars[iC] & 7
+        // Bitwise min(stars, 8)
+        const d = stars[iC] - 8
+        stars[iC] += d & (d>>31)
         dStars += stars[iC]
         return dStars
+      } else if (onCrop) {
+        iterAround(tiles, iTile, (i) => { ++levels[i] })
       }
     }
   }
@@ -404,6 +412,7 @@ function optimize(tiles) {
   const buildings = newBuildings(cities)
   let maxBuildings = []
   let maxSum = 0
+  const elem = document.getElementById("out")
 
   const tInc = Date.now()
   while (true) {
@@ -415,6 +424,8 @@ function optimize(tiles) {
         )
         if (starSum >= maxSum) {
           if (starSum > maxSum) {
+            //elem.innerHTML = 
+            alert(`${starSum} stars`)
             maxSum = starSum
             maxBuildings = []
           }

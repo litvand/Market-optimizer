@@ -1,7 +1,7 @@
 use std::cmp;
 use std::str::FromStr;
 
-struct MapLines<'a> {
+struct MapLines<'a> { 
   // Number of characters horizontally
   widthChars: usize,
 
@@ -10,9 +10,9 @@ struct MapLines<'a> {
 }
 
 #[derive(Copy, Eq)]
-struct Id(u8);
+pub struct Id(u8);
 
-struct Map {
+pub struct Map {
   // Number of tiles horizontally
   widthTiles: usize,
 
@@ -26,19 +26,19 @@ struct Map {
   cities: Vec<City>,
 }
 
-struct City {
+pub struct City {
   loc: usize,
   marketSpots: Vec<usize>,
   forgeSpots: Vec<ForgeSpot>,
   id: Id,
 }
 
-struct ForgeSpot {
+pub struct ForgeSpot {
   loc: usize,
   level: u8
 }
 
-type MapErr = String;
+pub type MapErr = String;
 
 impl<'a> MapLines<'a> {
   fn from_str(map: &'a str) -> Self {
@@ -93,7 +93,7 @@ impl Map {
   }
 }
 
-impl FromStr for Map {
+pub impl FromStr for Map {
   type Err = MapErr;
 
   fn from_str(map: &str) -> Result<Self,
@@ -108,6 +108,7 @@ const MAP: &str = "
 1f1f1f
 ";
 
-fn main() {
+#[test]
+fn test() {
   println!("{:?}", Map::from_str(MAP));
 }
